@@ -92,8 +92,8 @@ Environment variables, normally set in `/etc/cablemodem-exporter/env` (see
 way: no quotes or backslashes (`cablemodem-reboot` rejects them). Put a password that needs them in
 its own file and set `CM_PASSWORD_FILE`.
 
-| Variable | Default | |
-|----------|---------|---|
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `CM_PASSWORD` / `CM_PASSWORD_FILE` | required | Web UI password, or a file containing it |
 | `CM_HOST` | `192.168.100.1` | Modem address |
 | `CM_USERNAME` | `cusadmin` | Web UI user |
@@ -142,24 +142,86 @@ one poll and nothing lingers from an earlier one: values the modem reports as mi
 non-numeric (e.g. `N/A`) are absent rather than 0, and after a failed poll (or before the first)
 only the exporter's own metrics are present.
 
-Per-channel metrics are labelled `channel_id` and `frequency_mhz`.
+### Exporter
 
-| Metric | |
-|--------|---|
-| `cablemodem_up`, `cablemodem_last_success_timestamp_seconds`, `cablemodem_poll_duration_seconds` | Last poll |
-| `cablemodem_poll_errors_total{kind}` | `auth`, `protocol`, `transport`, `internal` |
-| `cablemodem_exporter_logins_total` | Logins made by the exporter; should stay flat |
-| `cablemodem_info{model,sw_version,hw_version,serial,docsis_mode}` | Identity |
-| `cablemodem_operational`, `cablemodem_network_access`, `cablemodem_status{status}`, `cablemodem_uptime_seconds` | Status |
-| `cablemodem_downstream_{snr_db,power_dbmv,frequency_hertz,locked,modulation}`, `..._channels_locked` | SC-QAM downstream |
-| `cablemodem_ofdm_downstream_{plc_power_dbmv,locked{stage},fft}` | DOCSIS 3.1 OFDM downstream |
-| `cablemodem_upstream_{power_dbmv,frequency_hertz,bandwidth_hertz,symbol_rate_symbols_per_second,modulation}`, `..._channels` | ATDMA upstream |
-| `cablemodem_ofdma_upstream_{active,power_dbmv,power_1_6mhz_dbmv,bandwidth_hertz,channel_gain_db,digital_attenuation_db}` | OFDMA upstream |
-| `cablemodem_events_total{category}`, `cablemodem_events_by_priority_total{priority}` | New event log entries seen |
-| `cablemodem_cm_status_events_total{code,description,channel_id}` | DOCSIS CM-STATUS messages, decoded |
-| `cablemodem_last_event_timestamp_seconds{category}` | Newest event seen per category |
-| `cablemodem_event_log_entries{priority}` | Lines currently in the modem's log (0 for absent priorities) |
-| `cablemodem_event_log_entry_timestamp_seconds{time,priority,category,message}` | **Opt-in**, see below |
+| Metric | Labels | Description |
+|--------|--------|-------------|
+| `cablemodem_up` | | 1 if the last poll of the modem succeeded |
+| `cablemodem_last_success_timestamp_seconds` | | Time of the last successful poll |
+| `cablemodem_poll_duration_seconds` | | Duration of the last poll |
+| `cablemodem_poll_errors_total` | `kind` | Failed polls: `auth`, `protocol`, `transport` or `internal` |
+| `cablemodem_exporter_logins_total` | | Logins made by the exporter; should stay flat |
+| `cablemodem_exporter_build_info` | `version` | Exporter version |
+
+### Modem status
+
+| Metric | Labels | Description |
+|--------|--------|-------------|
+| `cablemodem_info` | `model`, `sw_version`, `hw_version`, `serial`, `docsis_mode` | Modem identity (value always 1) |
+| `cablemodem_status` | `status` | Status string, e.g. `OPERATIONAL` (value always 1) |
+| `cablemodem_operational` | | 1 if the modem reports OPERATIONAL |
+| `cablemodem_network_access` | | 1 if network access is Allowed |
+| `cablemodem_uptime_seconds` | | Modem uptime |
+
+### Downstream SC-QAM
+
+Labelled `channel_id` and `frequency_mhz`, plus any extra labels listed.
+
+| Metric | Extra labels | Description |
+|--------|--------------|-------------|
+| `cablemodem_downstream_snr_db` | | SNR/MER (locked channels only) |
+| `cablemodem_downstream_power_dbmv` | | Receive power (locked channels only) |
+| `cablemodem_downstream_frequency_hertz` | | Centre frequency |
+| `cablemodem_downstream_locked` | | 1 if the channel is locked |
+| `cablemodem_downstream_modulation` | `modulation` | Modulation, e.g. `256QAM` (value always 1) |
+| `cablemodem_downstream_channels_locked` | *(none)* | Number of locked channels |
+
+### Downstream OFDM (DOCSIS 3.1)
+
+Labelled `receiver` and `frequency_mhz`, plus any extra labels listed.
+
+| Metric | Extra labels | Description |
+|--------|--------------|-------------|
+| `cablemodem_ofdm_downstream_plc_power_dbmv` | | PLC power |
+| `cablemodem_ofdm_downstream_locked` | `stage` | Lock state per stage: `PLC`, `NCP`, `MDC1` |
+| `cablemodem_ofdm_downstream_fft` | `fft` | FFT size, e.g. `4K` (value always 1) |
+
+### Upstream ATDMA
+
+Labelled `channel_id` and `frequency_mhz`, plus any extra labels listed.
+
+| Metric | Extra labels | Description |
+|--------|--------------|-------------|
+| `cablemodem_upstream_power_dbmv` | | Transmit power |
+| `cablemodem_upstream_frequency_hertz` | | Centre frequency |
+| `cablemodem_upstream_bandwidth_hertz` | | Channel width |
+| `cablemodem_upstream_symbol_rate_symbols_per_second` | | Symbol rate |
+| `cablemodem_upstream_modulation` | `modulation`, `channel_type` | Modulation and channel type (value always 1) |
+| `cablemodem_upstream_channels` | *(none)* | Number of upstream channels |
+
+### Upstream OFDMA (DOCSIS 3.1)
+
+Labelled `channel`.
+
+| Metric | Description |
+|--------|-------------|
+| `cablemodem_ofdma_upstream_active` | 1 if the channel is operating |
+| `cablemodem_ofdma_upstream_power_dbmv` | Reported transmit power |
+| `cablemodem_ofdma_upstream_power_1_6mhz_dbmv` | Reported power per 1.6 MHz |
+| `cablemodem_ofdma_upstream_bandwidth_hertz` | Occupied bandwidth |
+| `cablemodem_ofdma_upstream_channel_gain_db` | Channel gain |
+| `cablemodem_ofdma_upstream_digital_attenuation_db` | Digital attenuation |
+
+### Event log
+
+| Metric | Labels | Description |
+|--------|--------|-------------|
+| `cablemodem_events_total` | `category` | New log entries seen |
+| `cablemodem_events_by_priority_total` | `priority` | New log entries seen |
+| `cablemodem_cm_status_events_total` | `code`, `description`, `channel_id` | DOCSIS CM-STATUS messages, decoded |
+| `cablemodem_last_event_timestamp_seconds` | `category` | Time of the newest event seen |
+| `cablemodem_event_log_entries` | `priority` | Lines currently in the modem's log (0 for absent priorities) |
+| `cablemodem_event_log_entry_timestamp_seconds` | `time`, `priority`, `category`, `message` | **Opt-in**: one series per log line (see below) |
 
 Event categories are a fixed list (`cm_status`, `gui_login`, `reboot`, `t3_timeout`, `mdd_lost`,
 …, `other`), priorities are the syslog names plus `other`, and CM-STATUS codes and channels are
@@ -249,8 +311,8 @@ pytest
 python make_dashboard.py > cablemodem-dashboard.json   # after editing make_dashboard.py
 ```
 
-| File | |
-|------|---|
+| File | Purpose |
+|------|---------|
 | `cablemodem_client.py` | Session handling, login, reads, and the guarded reboot; shared by both tools |
 | `cablemodem_exporter.py` | The `METRICS` table, parsing, the `Exporter` (polling and its snapshot), event log |
 | `cablemodem_reboot.py` | The `cablemodem-reboot` command |
