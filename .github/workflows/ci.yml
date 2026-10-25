@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e '.[test]'
+      - run: ruff check .
+      - run: pytest -q
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install promtool, for the dashboard PromQL tests
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends prometheus
+      - run: pip install build
+      - run: python -m build --sdist --outdir dist
+      - name: Test from the extracted source release, outside the checkout
+        run: |
+          mkdir /tmp/release && tar -xzf dist/*.tar.gz -C /tmp/release --strip-components=1
+          cd /tmp/release
+          for f in cablemodem-exporter.service cablemodem-exporter.env.example grafana-provider.yaml \
+                   cablemodem-dashboard.json make_dashboard.py SECURITY.md LICENSE; do test -f "$f"; done
+          python -m venv /tmp/test && /tmp/test/bin/pip install -q '.[test]' && /tmp/test/bin/pytest -q
+          python -m build --wheel --outdir /tmp/wheel
+      - name: Smoke-test the wheel built from the source release
+        run: |
+          python -m venv /tmp/clean && /tmp/clean/bin/pip install /tmp/wheel/*.whl
+          cd /tmp
+          /tmp/clean/bin/cablemodem-reboot --help
+          /tmp/clean/bin/python -c "
+          import importlib.metadata, cablemodem_exporter, cablemodem_reboot
+          assert cablemodem_exporter.__file__.startswith('/tmp/clean/'), cablemodem_exporter.__file__
+          assert importlib.metadata.metadata('cablemodem-exporter')['License-Expression'] == 'MIT'"

@@ -1,0 +1,30 @@
+[Unit]
+Description=Cable modem (Compal/CBN) Prometheus exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cablemodem-exporter
+Group=cablemodem-exporter
+# CM_PASSWORD and any overrides; see cablemodem-exporter.env.example.
+EnvironmentFile=/etc/cablemodem-exporter/env
+ExecStart=/opt/cablemodem-exporter/venv/bin/cablemodem-exporter
+# Creates /var/lib/cablemodem owned by the service user and exports STATE_DIRECTORY.
+StateDirectory=cablemodem
+StateDirectoryMode=0750
+Restart=always
+RestartSec=10
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

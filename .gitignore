@@ -1,0 +1,13 @@
+__pycache__/
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Local settings: these hold the modem password.
+/env
+.env
+*.env

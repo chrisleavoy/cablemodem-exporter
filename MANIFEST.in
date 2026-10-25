@@ -1,0 +1,5 @@
+# Everything needed to test and deploy from a source release.
+include LICENSE README.md SECURITY.md
+include make_dashboard.py cablemodem-dashboard.json grafana-provider.yaml
+include cablemodem-exporter.service cablemodem-exporter.env.example
+recursive-include tests *.py *.xml *.html
